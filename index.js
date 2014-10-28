@@ -34,12 +34,18 @@ function size (ary) {
 
 module.exports = function (config) {
 
+  function mustHave(key) {
+    if(!config[key])
+      throw new Error('log-rotate-s3: *must* have config.'+key)
+  }
+
   if(!config)
     throw new Error('log-rotate-s3: *must* have config object')
-  if(!config.logDir)
-    throw new Error('log-rotate-s3: *must* have config.logDir')
-  if(!config.bucket)
-    throw new Error('log-rotate-s3: *must* have config.bucket')
+
+  mustHave('logDir')
+  mustHave('bucket')
+  mustHave('accessKeyId')
+  mustHave('secretAccessKey')
 
   var max = config.maxUnarchived || 500*1024*1024
   var pattern = config.glob || '*/*/*/*'
@@ -48,10 +54,14 @@ module.exports = function (config) {
     s3Options: config
   })
 
+  var emitter = new EventEmitter()
+
   ;(function scan () {
     ls(path.join(config.logDir, pattern), function (err, ls) {
       var total = size(ls)
       console.log(total, max, total - max)
+
+      emitter.emit('check', total, max)
 
       ;(function archive () {
         total = size(ls)
@@ -76,16 +86,18 @@ module.exports = function (config) {
             //work around...
             var _err = new Error(err.message)
             _err.stack = err.stack + _err.stack
-            throw _err
+            emitter.emit('error', err)
           })
           .on('end', function () {
             fs.unlink(file.filename, archive)
           })
 
+        emitter.upload('upload', uploader)
+
       })()
     })
 
   })()
-
+  return emitter
 }
 
