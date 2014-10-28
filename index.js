@@ -41,7 +41,7 @@ module.exports = function (config) {
   if(!config.bucket)
     throw new Error('log-rotate-s3: *must* have config.bucket')
 
-  var max = max || 500*1024*1024
+  var max = config.maxUnarchived || 500*1024*1024
   var pattern = config.glob || '*/*/*/*'
   var interval = config.interval || 10*60*1000 // ten minutes
   var client = s3.createClient({
